@@ -1,107 +1,161 @@
-import { useState, useEffect, SyntheticEvent } from "react";
-import { useLocalStorage, useDarkMode } from "usehooks-ts";
+import { useDroppable, useDraggable } from "@dnd-kit/core";
+import { Cross2Icon } from "@radix-ui/react-icons";
 import {
-  Cross2Icon,
-  MoonIcon,
-  SunIcon,
-  PaperPlaneIcon,
-} from "@radix-ui/react-icons";
+  closestCenter,
+  DndContext,
+  MouseSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 
-type TodoType = {
+import "./index.css";
+import { ReactNode, SyntheticEvent, useState } from "react";
+
+type itemType = {
   id: string;
-  task: string;
-  done: boolean;
+  children?: ReactNode;
+  label?: string;
+  callback?: () => void;
+};
+
+export const Droppable = ({ id, children, label }: itemType) => {
+  const { isOver, setNodeRef } = useDroppable({
+    id: id,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`border border-gray3 rounded-lg grow w-full p-4 bg-gray2 ${
+        isOver ? "bg-blue-100" : null
+      }`}
+    >
+      <div className="text-neutral-400 font-medium">{label}</div>
+      <div className="">{children}</div>
+    </div>
+  );
+};
+
+export const Draggable = ({ id, children, callback }: itemType) => {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: id,
+  });
+  const style = {
+    transform: transform
+      ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+      : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="flex items-center rounded border border-black bg-gray1 text-gray11 justify-between my-4 px-2"
+    >
+      <div className="p-2 text-center ">{children}</div>
+      <button onClick={callback}>
+        <Cross2Icon />
+      </button>
+    </div>
+  );
 };
 
 export default function App() {
   const [value, setValue] = useState("");
-  const { isDarkMode, toggle, enable, disable } = useDarkMode();
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: { delay: 50, tolerance: 10 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 100, tolerance: 10 },
+    }),
+    useSensor(KeyboardSensor, {
+      keyboardCodes: {
+        start: ["Space"],
+        cancel: ["Escape"],
+        end: ["Space"],
+      },
+    })
+  );
 
-  const [todo, setTodo] = useLocalStorage<TodoType[]>("todos", []);
+  // DropZones
+  const containers = ["To Do", "In Progress", "Done"];
 
-  useEffect(() => {
-    if (localStorage.getItem("todos") != null) {
-      setTodo(JSON.parse(localStorage.getItem("todos") || "{}"));
-    }
-  }, []);
+  // Items
+  const [items, setItems] = useState([
+    { parent: "To Do", value: "x-3", id: crypto.randomUUID() },
+    { parent: "To Do", value: "2x-4", id: crypto.randomUUID() },
+    { parent: "To Do", value: "x^2-9", id: crypto.randomUUID() },
+  ]);
 
-  const toggleTodo = (id: string) => {
-    let copy = [...todo];
-
-    copy.map((item) => {
-      item.id === id ? (item.done = !item.done) : null;
-    });
-    setTodo([...copy]);
-  };
-
-  const deleteTodo = (id: string) => {
-    let copy = [...todo];
-
-    const index = copy.findIndex((item) => item.id === id);
-
-    copy.splice(index, 1);
-
-    setTodo([...copy]);
-  };
-
-  const addTodo = (e: SyntheticEvent) => {
+  // Add new Item
+  const addNewItem = (e: SyntheticEvent) => {
     e.preventDefault();
-    if (value.trim() != "") {
-      setTodo([
-        ...todo,
-        {
-          id: crypto.randomUUID(),
-          task: value,
-          done: false,
-        },
-      ]);
-    }
-    setValue(() => "");
+    setItems([
+      ...items,
+      {
+        parent: "To Do",
+        value: value,
+        id: crypto.randomUUID(),
+      },
+    ]);
+    setValue("");
   };
-  return (
-    <div className={`${isDarkMode ? "dark" : "light"}`}>
-      <div className="h-screen flex flex-col dark:bg-black dark:text-neutral-500 text-lg">
-        <div className="border-b dark:border-neutral-800 flex justify-end p-1">
-          <button onClick={toggle} className="px-6 py-4">
-            {isDarkMode ? <SunIcon /> : <MoonIcon />}
-          </button>
-        </div>
 
-        <div className="p-4 grow ">
-          {todo.map((item) => {
-            return (
-              <div key={item.id} className="flex mb-4 dark:text-neutral-300">
-                <div
-                  className={`${
-                    item.done
-                      ? "line-through bg-blue-50 dark:bg-slate-950 text-slate-400 dark:text-slate-700"
-                      : "hover:bg-blue-200  bg-blue-100 dark:bg-slate-900"
-                  } hover:dark:bg-slate-800 grow rounded-l px-4 py-2 cursor-pointer	`}
-                  onClick={() => toggleTodo(item.id)}
-                >
-                  {item.task}
-                </div>
-                <button
-                  onClick={() => deleteTodo(item.id)}
-                  className="hover:bg-blue-200 bg-blue-100 dark:bg-slate-900 rounded-r py-1 px-4"
-                >
-                  <Cross2Icon />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-        <form onSubmit={(e) => addTodo(e)} className="flex">
+  return (
+    <div className="bg-gray1 h-screen px-6 py-4 flex flex-col">
+      <div className="  mb-8 bg-gray2 rounded max-w-2xl">
+        <form onSubmit={addNewItem} className="w-full flex">
           <input
-            className="w-full focus:outline-none border-t dark:border-neutral-800 bg-transparent px-4 "
+            placeholder="Insert the item here"
+            className="bg-gray3 w-full rounded py-2 px-2 placeholder:italic focus:outline-none text-gray9"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             type="text"
           />
-          <button type="submit" className="bg-blue-600 text-white px-6 py-4">
-            <PaperPlaneIcon />
-          </button>
+          <button className="bg-blue-600 px-4 text-white">add</button>
         </form>
+      </div>
+      <div className="grow flex justify-between gap-2">
+        <DndContext
+          onDragEnd={(e) =>
+            setItems(
+              items.map((item) =>
+                item.id === e.active.id
+                  ? { ...item, parent: e.over!.id.toString() }
+                  : item
+              )
+            )
+          }
+          sensors={sensors}
+          collisionDetection={closestCenter}
+        >
+          {containers.map((id) => (
+            <Droppable key={id} id={id} label={id}>
+              {items.map((item) => {
+                return item.parent === id ? (
+                  <Draggable
+                    key={item.id}
+                    id={item.id}
+                    callback={() =>
+                      setItems(
+                        items.filter((current) => {
+                          return current.id !== item.id;
+                        })
+                      )
+                    }
+                  >
+                    {item.value}
+                  </Draggable>
+                ) : null;
+              })}
+            </Droppable>
+          ))}
+        </DndContext>
       </div>
     </div>
   );
