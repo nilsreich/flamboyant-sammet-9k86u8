@@ -1,107 +1,88 @@
-import { useState, useEffect, SyntheticEvent } from "react";
-import { useLocalStorage, useDarkMode } from "usehooks-ts";
-import {
-  Cross2Icon,
-  MoonIcon,
-  SunIcon,
-  PaperPlaneIcon,
-} from "@radix-ui/react-icons";
+import { useState } from "react";
+import { create, all } from "mathjs";
 
-type TodoType = {
-  id: string;
-  task: string;
-  done: boolean;
-};
+// create a mathjs instance with configuration
+const math = create(all, {
+  epsilon: 1e-12,
+  matrix: "Matrix",
+  number: "BigNumber",
+  precision: 64,
+  predictable: false,
+  randomSeed: null,
+});
 
 export default function App() {
-  const [value, setValue] = useState("");
-  const { isDarkMode, toggle, enable, disable } = useDarkMode();
+  const numkey = [...Array(10).keys()];
+  const funckey = ["-", "+", "*", "/"];
+  const [input, setInput] = useState("");
+  const [result, setResult] = useState("");
 
-  const [todo, setTodo] = useLocalStorage<TodoType[]>("todos", []);
-
-  useEffect(() => {
-    if (localStorage.getItem("todos") != null) {
-      setTodo(JSON.parse(localStorage.getItem("todos") || "{}"));
-    }
-  }, []);
-
-  const toggleTodo = (id: string) => {
-    let copy = [...todo];
-
-    copy.map((item) => {
-      item.id === id ? (item.done = !item.done) : null;
-    });
-    setTodo([...copy]);
+  const solve = () => {
+    setResult(() => math.evaluate(input).toString());
   };
 
-  const deleteTodo = (id: string) => {
-    let copy = [...todo];
-
-    const index = copy.findIndex((item) => item.id === id);
-
-    copy.splice(index, 1);
-
-    setTodo([...copy]);
-  };
-
-  const addTodo = (e: SyntheticEvent) => {
-    e.preventDefault();
-    if (value.trim() != "") {
-      setTodo([
-        ...todo,
-        {
-          id: crypto.randomUUID(),
-          task: value,
-          done: false,
-        },
-      ]);
+  const handleKey = (key: string) => {
+    if (key.match(/[\d\+\.\-\/]/)) {
+      setInput(() => input + key);
+    } else if (key === "Backspace") {
+      setInput(() => input.slice(0, -1));
+    } else if (key === "Enter") {
+      setResult(() => math.evaluate(input).toString());
     }
-    setValue(() => "");
   };
   return (
-    <div className={`${isDarkMode ? "dark" : "light"}`}>
-      <div className="h-screen flex flex-col dark:bg-black dark:text-neutral-500 text-lg">
-        <div className="border-b dark:border-neutral-800 flex justify-end p-1">
-          <button onClick={toggle} className="px-6 py-4">
-            {isDarkMode ? <SunIcon /> : <MoonIcon />}
-          </button>
-        </div>
-
-        <div className="p-4 grow ">
-          {todo.map((item) => {
+    <div
+      className="h-screen flex flex-col pb-2"
+      onKeyDown={(e) => handleKey(e.key)}
+      tabIndex={0}
+    >
+      <div className="m-2 px-2 py-2 bg-slate-100 grow text-3xl">
+        <div>{input}</div>
+        <div className="text-xl">{result}</div>
+      </div>
+      <div className="grid grid-cols-4 gap-2 mx-2">
+        <div className="col-span-3 grid grid-cols-3 gap-2">
+          {numkey.map((item) => {
             return (
-              <div key={item.id} className="flex mb-4 dark:text-neutral-300">
-                <div
-                  className={`${
-                    item.done
-                      ? "line-through bg-blue-50 dark:bg-slate-950 text-slate-400 dark:text-slate-700"
-                      : "hover:bg-blue-200  bg-blue-100 dark:bg-slate-900"
-                  } hover:dark:bg-slate-800 grow rounded-l px-4 py-2 cursor-pointer	`}
-                  onClick={() => toggleTodo(item.id)}
-                >
-                  {item.task}
-                </div>
-                <button
-                  onClick={() => deleteTodo(item.id)}
-                  className="hover:bg-blue-200 bg-blue-100 dark:bg-slate-900 rounded-r py-1 px-4"
-                >
-                  <Cross2Icon />
-                </button>
-              </div>
+              <button
+                onClick={() => setInput(input + item)}
+                className="rounded bg-blue-300 hover:bg-blue-200 py-2"
+              >
+                {item}
+              </button>
             );
           })}
-        </div>
-        <form onSubmit={(e) => addTodo(e)} className="flex">
-          <input
-            className="w-full focus:outline-none border-t dark:border-neutral-800 bg-transparent px-4 "
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            type="text"
-          />
-          <button type="submit" className="bg-blue-600 text-white px-6 py-4">
-            <PaperPlaneIcon />
+          <button
+            onClick={() => setInput(input + ".")}
+            className="rounded bg-blue-300 hover:bg-blue-200 py-2"
+          >
+            .
           </button>
-        </form>
+          <button
+            className="rounded bg-blue-300 hover:bg-blue-200 py-2"
+            onClick={() => setInput(() => input.slice(0, -1))}
+          >
+            rem
+          </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {funckey.map((item) => {
+            return (
+              <button
+                onClick={() => setInput(input + item)}
+                className="rounded bg-blue-100 py-2 hover:bg-blue-50"
+              >
+                {item}
+              </button>
+            );
+          })}
+          <button
+            className="rounded bg-teal-200 py-2 hover:bg-teal-100"
+            onClick={() => solve()}
+          >
+            =
+          </button>
+        </div>
       </div>
     </div>
   );
